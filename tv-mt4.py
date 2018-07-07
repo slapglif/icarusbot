@@ -8,8 +8,11 @@ LOG_FILENAME = 'trades.log'
 logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO)
 
 volume = '0.1'
+
+imap = "imap.gmail.com"
 user = ''
 pwd = ''
+folder = '"[Gmail]/All Mail"'
 
 print("Connecting to the mt4 server...")
 logging.info("Connecting to the mt4 server...")
@@ -45,9 +48,9 @@ logging.info("Listening to email server...")
 
 def readmail(volume):
     time.sleep(1.5)
-    m = imaplib.IMAP4_SSL("imap.gmail.com")
+    m = imaplib.IMAP4_SSL(imap)
     m.login(user, pwd)
-    m.select('"[Gmail]/All Mail"')
+    m.select(folder)
     resp, items = m.search(None,
                            "NOT SEEN FROM tradingview")
     items = items[0].split()
