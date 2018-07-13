@@ -1,0 +1,11 @@
+{
+  "volume": "0.1",
+  "debug": "1",
+  "LOG_FILENAME": "trade.log",
+  "imap": "imap.gmail.com",
+  "user": "",
+  "pwd": "",
+  "folder": "[Gmail]/All Mail",
+  "socket1": "tcp://127.0.0.1:5557",
+  "socket2": "tcp://127.0.0.1:5558"
+}
