@@ -3,25 +3,38 @@ import zmq
 import random
 import datetime, time
 import logging
+import json
 
-LOG_FILENAME = 'trades.log'
+with open('config.json') as json_data_file:
+        config = json.load(json_data_file)
+
+volume = config['volume']
+debug = config['debug']
+LOG_FILENAME = config['LOG_FILENAME']
+imap = config['imap']
+user = config['user']
+pwd = config['pwd']
+folder = config['folder']
+
+
+def log(msg):
+    if debug == "1":
+        print(msg)
+    logging.info(msg)
+
+
+log("Connecting to the mt4 server...")
+
+# INIT
 logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO)
-
-volume = '0.1'
-
-imap = "imap.gmail.com"
-user = ''
-pwd = ''
-folder = '"[Gmail]/All Mail"'
-
-print("Connecting to the mt4 server...")
-logging.info("Connecting to the mt4 server...")
-
-c = zmq.Context()
-s = c.socket(zmq.REQ)
-s.connect("tcp://127.0.0.1:5557")
-r = c.socket(zmq.PULL)
-r.connect("tcp://127.0.0.1:5558")
+try:
+    c = zmq.Context()
+    s = c.socket(zmq.REQ)
+    s.connect(config['socket1'])
+    r = c.socket(zmq.PULL)
+    r.connect(config['socket2'])
+except Exception as e:
+    log(e)
 
 
 def generate_nonce(length=8):
@@ -33,24 +46,21 @@ def trade(signal,volume,pair):
     try:
         trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|0|0|IcarusBot Trade|' + generate_nonce() + '|' + volume
         s.send_string(trade, encoding='utf-8')
-        print("Waiting for metatrader to respond...")
-        logging.info("Waiting for metatrader to respond...")
+        log("Waiting for metatrader to respond...")
         m = s.recv()
-        print("Reply from server ", m)
+        log("Reply from server " + m)
     except Exception as e:
-        print(e)
-        logging.info(e)
+        log(e)
 
 
-print("Listening to email server...")
-logging.info("Listening to email server...")
+log("Listening to email server...")
 
 
 def readmail(volume):
     time.sleep(1.5)
     m = imaplib.IMAP4_SSL(imap)
     m.login(user, pwd)
-    m.select(folder)
+    m.select('"' + folder + '"')
     resp, items = m.search(None,
                            "NOT SEEN FROM tradingview")
     items = items[0].split()
@@ -66,21 +76,25 @@ def readmail(volume):
             if mail['Subject'].split()[3] == "Buy":
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + ' \x1b[6;30;42m' + 'Buy' + '\x1b[0m' + ' Triggered on ' + pair)
-                logging.info(st + ' Buy' + ' Triggered on ' + pair)
+                log(st + ' Buy' + ' Triggered on ' + pair)
                 trade('0', volume, pair)
+                if pair == "SPX500":
+                    trade("0", volume, "DJI30")
+                    log(st + ' Buy' + ' Triggered on ' + "DJI30")
             if mail['Subject'].split()[3] == "Sell":
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + ' \x1b[6;30;41m' + 'Sell' + '\x1b[0m' + ' Triggered on ' + pair)
-                logging.info(st + ' Sell' + ' Triggered on ' + pair)
+                log(st + ' Sell' + ' Triggered on ' + pair)
                 trade("1", volume, pair)
+                if pair == "SPX500":
+                    trade("1", volume, "DJI30")
+                    log(st + ' Buy' + ' Triggered on ' + "DJI30")
         except Exception as e:
-            print(e)
-            logging.info(e)
+            log(e)
 
 
 while True:
     try:
         readmail(volume)
     except Exception as e:
-        print(e)
-        logging.info(e)
+        log(e)
