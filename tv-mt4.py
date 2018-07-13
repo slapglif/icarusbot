@@ -15,6 +15,8 @@ imap = config['imap']
 user = config['user']
 pwd = config['pwd']
 folder = config['folder']
+STOPLOSS = config['STOPLOSS']
+TAKEPROFIT = config['TAKEPROFIT']
 
 
 def log(msg):
@@ -42,9 +44,10 @@ def generate_nonce(length=8):
     return ''.join([str(random.randint(0, 9)) for i in range(length)])
 
 
-def trade(signal,volume,pair):
+def trade(signal, volume, pair):
     try:
-        trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|0|0|IcarusBot Trade|' + generate_nonce() + '|' + volume
+        trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
+                '|IcarusBot Trade|' + generate_nonce() + '|' + volume
         s.send_string(trade, encoding='utf-8')
         log("Waiting for metatrader to respond...")
         m = s.recv()
