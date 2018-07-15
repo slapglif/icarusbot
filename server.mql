@@ -1,4 +1,5 @@
 //adapted from template: https://github.com/darwinex/DarwinexLabs/blob/master/tools/MQL4/ZeroMQ_MT4_EA_Template.mq4
+//Thanks to Ryan Scherck for his origional code
 #include <Zmq/Zmq.mqh>
 #include <stdlib.mqh>
 #include <stderror.mqh>
@@ -28,7 +29,7 @@ extern int MILLISECOND_TIMER = 1;
 int OnInit()
   {
 //---
-   Print("Vega bot starting");
+   Print("Icarus bot starting");
    EventSetMillisecondTimer(MILLISECOND_TIMER);     // Set Millisecond Timer to get client socket input
 
    Print("[REP] Binding MT4 Server to Socket on Port " + REP_PORT + "..");
