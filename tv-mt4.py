@@ -8,7 +8,10 @@ import numpy as np
 
 with open('config.json') as json_data_file:
         config = json.load(json_data_file)
-
+try:
+    trades = np.load('trades.npy').item()
+except:
+    trades = {}
 
 volume = config['volume']
 debug = config['debug']
@@ -19,10 +22,6 @@ pwd = config['pwd']
 folder = config['folder']
 STOPLOSS = config['STOPLOSS']
 TAKEPROFIT = config['TAKEPROFIT']
-try:
-    trades = np.load('trades.npy').item()
-except:
-    trades = {}
 
 
 def generate_nonce(length=8):
