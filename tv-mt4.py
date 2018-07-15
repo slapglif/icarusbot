@@ -25,7 +25,6 @@ TAKEPROFIT = config['TAKEPROFIT']
 
 
 def generate_nonce(length=8):
-    """Generate pseudorandom number."""
     return ''.join([str(random.randint(0, 9)) for i in range(length)])
 
 
@@ -83,7 +82,7 @@ def readmail(volume, trades):
     m.login(user, pwd)
     m.select('"' + folder + '"')
     resp, items = m.search(None,
-                           "NOT SEEN FROM tradingview")
+                           "NOT SEEN SUBJECT tradingview")
     items = items[0].split()
     for emailid in items:
         resp, data = m.fetch(emailid,
