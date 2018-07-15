@@ -133,13 +133,15 @@ def readmail(volume, trades):
             for close in trades:
                 if pair in close:
                     nonce = close
+                    if pair == "SPX500":
+                        nonce2 = trades["DJI30"]
             if mail['Subject'].split()[3] == "Close":
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + ' \x1b[6;30;42m' + 'Close' + '\x1b[0m' + ' Triggered on ' + pair)
                 log(st + ' Close' + ' Triggered on ' + pair)
                 trade('0', volume, pair, trades, "Close", nonce)
                 if pair == "SPX500":
-                    trade("0", volume, "DJI30", trades, "Close", nonce)
+                    trade("0", volume, "DJI30", trades, "Close", nonce2)
                     log(st + ' Close' + ' Triggered on ' + "DJI30")
         except Exception as e:
             log(e)
