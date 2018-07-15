@@ -4,9 +4,11 @@ import random
 import datetime, time
 import logging
 import json
+import numpy as np
 
 with open('config.json') as json_data_file:
         config = json.load(json_data_file)
+
 
 volume = config['volume']
 debug = config['debug']
@@ -17,6 +19,12 @@ pwd = config['pwd']
 folder = config['folder']
 STOPLOSS = config['STOPLOSS']
 TAKEPROFIT = config['TAKEPROFIT']
+trades = np.load('trades.npy').item()
+
+
+def generate_nonce(length=8):
+    """Generate pseudorandom number."""
+    return ''.join([str(random.randint(0, 9)) for i in range(length)])
 
 
 def log(msg):
@@ -39,27 +47,35 @@ except Exception as e:
     log(e)
 
 
-def generate_nonce(length=8):
-    """Generate pseudorandom number."""
-    return ''.join([str(random.randint(0, 9)) for i in range(length)])
-
-
-def trade(signal, volume, pair):
-    try:
-        trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
-                '|IcarusBot Trade|' + generate_nonce() + '|' + volume
-        s.send_string(trade, encoding='utf-8')
-        log("Waiting for metatrader to respond...")
-        m = s.recv()
-        log("Reply from server " + m)
-    except Exception as e:
-        log(e)
+def trade(signal, volume, pair, trades, type, nonce):
+    if 'Open' in type:
+        try:
+            trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
+                    '|IcarusBot Trade|' + nonce + '|' + volume
+            s.send_string(trade, encoding='utf-8')
+            log("Waiting for metatrader to respond...")
+            m = s.recv()
+            # log("Reply from server " + m)
+            trades[pair] = nonce
+        except Exception as e:
+            log(e)
+    else:
+        try:
+            trade = 'TRADE|CLOSE|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
+                '|IcarusBot Trade|' + trades[pair] + '|' + volume
+            s.send_string(trade, encoding='utf-8')
+            log("Waiting for metatrader to respond...")
+            m = s.recv()
+            # log("Reply from server " + m)
+            trades[pair] = None
+        except Exception as e:
+            log(e)
 
 
 log("Listening to email server...")
 
 
-def readmail(volume):
+def readmail(volume, trades):
     time.sleep(1.5)
     m = imaplib.IMAP4_SSL(imap)
     m.login(user, pwd)
@@ -74,30 +90,63 @@ def readmail(volume):
         mail = email.message_from_bytes(email_body)
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+        nonce = generate_nonce()
+
+        # Open Trade
+
         try:
             pair = mail['Subject'].split()[2]
             if mail['Subject'].split()[3] == "Buy":
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + ' \x1b[6;30;42m' + 'Buy' + '\x1b[0m' + ' Triggered on ' + pair)
                 log(st + ' Buy' + ' Triggered on ' + pair)
-                trade('0', volume, pair)
-                if pair == "SPX500":
-                    trade("0", volume, "DJI30")
-                    log(st + ' Buy' + ' Triggered on ' + "DJI30")
+                if pair in trades:
+                    trade('1', volume, pair, trades, "Close", trades[pair])
+                    log("Close and Reverse triggered on " + pair)
+                    trade('0', volume, pair, trades, "Open", nonce)
+                else:
+                    trade('0', volume, pair, trades, "Open", nonce)
+                    if pair == "SPX500":
+                        trade("0", volume, "DJI30", trades, "Open", nonce)
+                        log(st + ' Buy' + ' Triggered on ' + "DJI30")
             if mail['Subject'].split()[3] == "Sell":
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + ' \x1b[6;30;41m' + 'Sell' + '\x1b[0m' + ' Triggered on ' + pair)
                 log(st + ' Sell' + ' Triggered on ' + pair)
-                trade("1", volume, pair)
+                if pair in trades:
+                    trade('0', volume, pair, trades, "Close", trades[pair])
+                    log("Close and Reverse triggered on " + pair)
+                    trade('1', volume, pair, trades, "Open", nonce)
+                else:
+                    trade("1", volume, pair, trades, "Open", nonce)
+                    if pair == "SPX500":
+                        trade("1", volume, "DJI30", trades, "Open", nonce)
+                        log(st + ' Buy' + ' Triggered on ' + "DJI30")
+        except Exception as e:
+            log(e)
+
+        # Close Trade
+
+        try:
+            pair = mail['Subject'].split()[2]
+            for close in trades:
+                if pair in close:
+                    nonce = close
+            if mail['Subject'].split()[3] == "Close":
+                m.store(emailid, '+FLAGS', '\Seen')
+                print(st + ' \x1b[6;30;42m' + 'Close' + '\x1b[0m' + ' Triggered on ' + pair)
+                log(st + ' Close' + ' Triggered on ' + pair)
+                trade('0', volume, pair, trades, "Close", nonce)
                 if pair == "SPX500":
-                    trade("1", volume, "DJI30")
-                    log(st + ' Buy' + ' Triggered on ' + "DJI30")
+                    trade("0", volume, "DJI30", trades, "Close", nonce)
+                    log(st + ' Close' + ' Triggered on ' + "DJI30")
         except Exception as e:
             log(e)
 
 
 while True:
     try:
-        readmail(volume)
+        readmail(volume, trades)
+        np.save('trades.npy', trades)
     except Exception as e:
         log(e)
