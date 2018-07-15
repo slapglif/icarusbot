@@ -19,7 +19,10 @@ pwd = config['pwd']
 folder = config['folder']
 STOPLOSS = config['STOPLOSS']
 TAKEPROFIT = config['TAKEPROFIT']
-trades = np.load('trades.npy').item()
+try:
+    trades = np.load('trades.npy').item()
+except:
+    trades = {}
 
 
 def generate_nonce(length=8):
