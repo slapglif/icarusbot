@@ -1,14 +1,14 @@
 //adapted from template: https://github.com/darwinex/DarwinexLabs/blob/master/tools/MQL4/ZeroMQ_MT4_EA_Template.mq4
-//Thanks to Ryan Scherck for his origional code
 #include <Zmq/Zmq.mqh>
 #include <stdlib.mqh>
 #include <stderror.mqh>
+//#include <Bots/vegabot.mqh>
 //+------------------------------------------------------------------+
 //| Bot server in MQL                                        |
 //| Binds REP socket to tcp://*:5555                                 |
 //+------------------------------------------------------------------+
 int start_bot = 1;
-extern string BOT_NAME = "Icarus Bot";
+extern string BOT_NAME = "Vega Bot";
 extern string ZEROMQ_PROTOCOL = "tcp";
 extern string HOSTNAME = "127.0.0.1";
 extern int REP_PORT = 5557;
@@ -29,7 +29,7 @@ extern int MILLISECOND_TIMER = 1;
 int OnInit()
   {
 //---
-   Print("Icarus bot starting");
+   Print("Vega bot starting");
    EventSetMillisecondTimer(MILLISECOND_TIMER);     // Set Millisecond Timer to get client socket input
 
    Print("[REP] Binding MT4 Server to Socket on Port " + REP_PORT + "..");
@@ -188,6 +188,8 @@ void InterpretZmqMessage(Socket &pSocket, string& compArray[]) {
       switch_action = 3;
    if(compArray[0] == "DATA")
       switch_action = 4;
+   if(compArray[0] == "TRADE" && compArray[1] == "MODIFY")
+      switch_action = 5;
 
    string ret = "";
    int ticket = -1;
@@ -231,15 +233,15 @@ void InterpretZmqMessage(Socket &pSocket, string& compArray[]) {
          InformPullClient(pSocket, "CLOSE TRADE Instruction Received");
          int openorders=OrdersTotal();
          for(int OR=0;OR<openorders;OR++)
-          {
+           {
             OrderSelect(OR,SELECT_BY_POS,MODE_TRADES);
             if(OrderMagicNumber()==ticketNumber)
               {
                string order = OrderTicket();
                OrderClose(order,volume,Ask,slippage,CLR_NONE);
-              } // exit
-          } 
-        }
+              } 
+           } 
+         }
          ret = StringFormat("Trade Closed (Ticket: %d)", ticketNumber);
          InformPullClient(pSocket, ret);
 
@@ -275,6 +277,28 @@ void InterpretZmqMessage(Socket &pSocket, string& compArray[]) {
          }
 
          break;
+         case 5:
+         {
+            Print("MODIFY TRADE Instruction Received");
+            InformPullClient(pSocket, "MODIFY TRADE Instruction Received");
+            int openorders=OrdersTotal();
+            for(int OR=0;OR<openorders;OR++)
+               {
+               OrderSelect(OR,SELECT_BY_POS,MODE_TRADES);
+               if(OrderMagicNumber()==ticketNumber)
+                  {
+                     string order = OrderTicket();
+                     OrderModify(order,OrderOpenPrice(),NormalizeDouble(stopLoss,Digits),takeProfit,0,CLR_NONE);
+                     ret = StringFormat("Trade Modified (Ticket: %d)", ticketNumber);
+                     InformPullClient(pSocket, ret);
+                     break;
+                  } 
+               } 
+               
+           }
+               
+            
+            break;
 
       default:
          break;
