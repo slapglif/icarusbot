@@ -8,4 +8,6 @@
   "folder": "[Gmail]/All Mail",
   "socket1": "tcp://127.0.0.1:5557",
   "socket2": "tcp://127.0.0.1:5558"
+   "STOPLOSS": "0",
+  "TAKEPROFIT": "0"
 }
