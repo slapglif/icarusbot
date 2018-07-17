@@ -57,29 +57,30 @@ except Exception as e:
 
 
 def trade(signal, volume, pair, trades, type, nonce):
-    if 'Open' in type:
-        try:
-            trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
-                    '|IcarusBot Trade|' + nonce + '|' + volume
+    try:
+        trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
+                '|IcarusBot Trade|' + nonce + '|' + volume
+        s.send_string(trade, encoding='utf-8')
+        log("Waiting for metatrader to respond...")
+        m = s.recv()
+        # log("Reply from server " + m)
+        trades[pair] = nonce
+    except Exception as e:
+        log(e)
+
+
+def close(signal, volume, pair, trades):
+    try:
+        if trades[pair] is not None:
+            trade = 'TRADE|CLOSE|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
+                    '|IcarusBot Trade|' + trades[pair] + '|' + volume
             s.send_string(trade, encoding='utf-8')
             log("Waiting for metatrader to respond...")
             m = s.recv()
             # log("Reply from server " + m)
-            trades[pair] = nonce
-        except Exception as e:
-            log(e)
-    else:
-        try:
-            if trades[pair] is not None:
-                trade = 'TRADE|CLOSE|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
-                    '|IcarusBot Trade|' + trades[pair] + '|' + volume
-                s.send_string(trade, encoding='utf-8')
-                log("Waiting for metatrader to respond...")
-                m = s.recv()
-                # log("Reply from server " + m)
-                trades[pair] = None
-        except Exception as e:
-            log(e)
+            trades[pair] = None
+    except Exception as e:
+        log(e)
 
 
 def modify(signal, volume, pair, trades, type):
@@ -166,9 +167,9 @@ def readmail(volume, trades):
                     m.store(emailid, '+FLAGS', '\Seen')
                     print(st + green("Close") + ' Triggered on ' + pair)
                     log(st + ' Close' + ' Triggered on ' + pair)
-                    trade('0', volume, pair, trades, "Close", nonce)
+                    close('0', volume, pair, trades, "Close", nonce)
                     if pair == "SPX500":
-                        trade("0", volume, "DJI30", trades, "Close", trades["DJI30"])
+                        close("0", volume, "DJI30", trades, "Close", trades["DJI30"])
                         log(st + ' Close' + ' Triggered on ' + "DJI30")
         except Exception as e:
             log(e)
