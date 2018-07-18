@@ -56,15 +56,20 @@ except Exception as e:
     log(e)
 
 
-def trade(signal, volume, pair, trades, type, nonce):
+def trade(signal, volume, pair, trades, nonce):
     try:
         trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
                 '|IcarusBot Trade|' + nonce + '|' + volume
         s.send_string(trade, encoding='utf-8')
         log("Waiting for metatrader to respond...")
-        m = s.recv()
-        # log("Reply from server " + m)
+        m = str(s.recv())
+        log("Reply from server " + m)
         trades[pair] = nonce
+        trades[nonce] = None
+        if signal == "0":
+            trades[nonce] = 'Long'
+        else:
+            trades[nonce] = 'Short'
     except Exception as e:
         log(e)
 
@@ -76,8 +81,9 @@ def close(signal, volume, pair, trades):
                     '|IcarusBot Trade|' + trades[pair] + '|' + volume
             s.send_string(trade, encoding='utf-8')
             log("Waiting for metatrader to respond...")
-            m = s.recv()
-            # log("Reply from server " + m)
+            m = str(s.recv())
+            log("Reply from server " + m)
+            trades[trades[pair]] = None
             trades[pair] = None
     except Exception as e:
         log(e)
@@ -90,8 +96,8 @@ def modify(signal, volume, pair, trades, type):
                     '|IcarusBot Trade|' + trades[pair] + '|' + volume
             s.send_string(trade, encoding='utf-8')
             log("Waiting for metatrader to respond...")
-            m = s.recv()
-            # log("Reply from server " + m)
+            m = str(s.recv())
+            log("Reply from server " + m)
     except Exception as e:
         log(e)
 
@@ -124,33 +130,33 @@ def readmail(volume, trades):
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + green("Buy") + ' Triggered on ' + pair)
                 log(st + ' Buy' + ' Triggered on ' + pair)
-                if pair in trades and not None:
-                    trade('1', volume, pair, trades, "Close", trades[pair])
+                if pair in trades and trades[pair] is not None:
+                    close('1', volume, pair, trades)
                     log("Close and Reverse triggered on " + pair)
-                    trade('0', volume, pair, trades, "Open", nonce)
+                    trade('0', volume, pair, trades,  nonce)
                     if pair == "SPX500":
-                        trade("0", volume, "DJI30", trades, "Open", nonce)
+                        trade("0", volume, "DJI30", trades,  nonce)
                         log(st + ' Buy' + ' Triggered on ' + "DJI30")
                 else:
-                    trade('0', volume, pair, trades, "Open", nonce)
+                    trade('0', volume, pair, trades,  nonce)
                     if pair == "SPX500":
-                        trade("0", volume, "DJI30", trades, "Open", nonce)
+                        trade("0", volume, "DJI30", trades, nonce)
                         log(st + ' Buy' + ' Triggered on ' + "DJI30")
             if mail['Subject'].split()[3] == "Sell":
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + red("Sell") + ' Triggered on ' + pair)
                 log(st + ' Sell' + ' Triggered on ' + pair)
-                if pair in trades and not None:
-                    trade('0', volume, pair, trades, "Close", trades[pair])
+                if pair in trades and trades[pair] is not None:
+                    close('0', volume, pair, trades)
                     log("Close and Reverse triggered on " + pair)
-                    trade('1', volume, pair, trades, "Open", nonce)
+                    trade('1', volume, pair, trades, nonce)
                     if pair == "SPX500":
-                        trade("1", volume, "DJI30", trades, "Open", nonce)
+                        trade("1", volume, "DJI30", trades, nonce)
                         log(st + ' Buy' + ' Triggered on ' + "DJI30")
                 else:
-                    trade("1", volume, pair, trades, "Open", nonce)
+                    trade("1", volume, pair, trades, nonce)
                     if pair == "SPX500":
-                        trade("1", volume, "DJI30", trades, "Open", nonce)
+                        trade("1", volume, "DJI30", trades, nonce)
                         log(st + ' Buy' + ' Triggered on ' + "DJI30")
         except Exception as e:
             log(e)
@@ -159,18 +165,20 @@ def readmail(volume, trades):
 
         try:
             pair = mail['Subject'].split()[2]
-            for close in trades:
-                if pair in close:
-                    nonce = close
             if mail['Subject'].split()[3] == "Close":
+                direction = mail['Subject'].split()[4]
+                for x in trades:
+                    if trades[pair] == x:
+                        nonce = x
                 if trades[pair] is not None:
-                    m.store(emailid, '+FLAGS', '\Seen')
-                    print(st + green("Close") + ' Triggered on ' + pair)
-                    log(st + ' Close' + ' Triggered on ' + pair)
-                    close('0', volume, pair, trades, "Close", nonce)
-                    if pair == "SPX500":
-                        close("0", volume, "DJI30", trades, "Close", trades["DJI30"])
-                        log(st + ' Close' + ' Triggered on ' + "DJI30")
+                    if trades[nonce] == direction:
+                        m.store(emailid, '+FLAGS', '\Seen')
+                        print(st + green("Close") + ' Triggered on ' + pair)
+                        log(st + ' Close' + ' Triggered on ' + pair)
+                        close('0', volume, pair, trades)
+                        if pair == "SPX500":
+                            close("0", volume, "DJI30", trades)
+                            log(st + ' Close' + ' Triggered on ' + "DJI30")
         except Exception as e:
             log(e)
 
