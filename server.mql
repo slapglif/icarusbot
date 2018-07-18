@@ -2,12 +2,13 @@
 #include <Zmq/Zmq.mqh>
 #include <stdlib.mqh>
 #include <stderror.mqh>
+//#include <Bots/vegabot.mqh>
 //+------------------------------------------------------------------+
 //| Bot server in MQL                                        |
 //| Binds REP socket to tcp://*:5555                                 |
 //+------------------------------------------------------------------+
 int start_bot = 1;
-extern string BOT_NAME = "Icarus Bot";
+extern string BOT_NAME = "Vega Bot";
 extern string ZEROMQ_PROTOCOL = "tcp";
 extern string HOSTNAME = "127.0.0.1";
 extern int REP_PORT = 5557;
@@ -28,7 +29,7 @@ extern int MILLISECOND_TIMER = 1;
 int OnInit()
   {
 //---
-   Print("Icarus bot starting");
+   Print("Vega bot starting");
    EventSetMillisecondTimer(MILLISECOND_TIMER);     // Set Millisecond Timer to get client socket input
 
    Print("[REP] Binding MT4 Server to Socket on Port " + REP_PORT + "..");
