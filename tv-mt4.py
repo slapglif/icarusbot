@@ -4,14 +4,14 @@ import random
 import datetime, time
 import logging
 import json
-import numpy as np
+import models
+from models import Trade
+
+db = models.Session()
 
 with open('config.json') as json_data_file:
         config = json.load(json_data_file)
-try:
-    trades = np.load('trades.npy').item()
-except:
-    trades = {}
+
 
 volume = config['volume']
 debug = config['debug']
@@ -22,14 +22,19 @@ pwd = config['pwd']
 folder = config['folder']
 STOPLOSS = config['STOPLOSS']
 TAKEPROFIT = config['TAKEPROFIT']
+hedging = config['hedge']
 
 
 def green(msg):
-        return ' \x1b[6;30;42m' + msg + '\x1b[0m'
+    return ' \x1b[6;30;42m' + msg + '\x1b[0m'
 
 
 def red(msg):
-        return ' \x1b[6;30;41m' + msg + '\x1b[0m'
+    return ' \x1b[6;30;41m' + msg + '\x1b[0m'
+
+
+def cyan(msg):
+    return ' \x1b[6;30;36m' + msg + '\x1b[0m'
 
 
 def generate_nonce(length=8):
@@ -56,48 +61,53 @@ except Exception as e:
     log(e)
 
 
-def trade(signal, volume, pair, trades, nonce):
+def trade(signal, volume, pair, nonce):
     try:
         trade = 'TRADE|OPEN|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
                 '|IcarusBot Trade|' + nonce + '|' + volume
         s.send_string(trade, encoding='utf-8')
         log("Waiting for metatrader to respond...")
-        m = str(s.recv())
-        log("Reply from server " + m)
-        trades[pair] = nonce
-        trades[nonce] = None
+        m = s.recv()
+        log("Reply from server " + m.decode('utf-8'))
         if signal == "0":
-            trades[nonce] = 'Long'
+            direction = 'Long'
         else:
-            trades[nonce] = 'Short'
+            direction = 'Short'
+        setup = db.query(Trade).filter_by(pair=pair).first()
+        setup.nonce = nonce
+        setup.pair = pair
+        setup.signal = direction
+        db.commit()
     except Exception as e:
         log(e)
 
 
-def close(signal, volume, pair, trades):
+def close(signal, volume, pair):
     try:
-        if trades[pair] is not None:
+        setup = db.query(Trade).filter_by(pair=pair).first()
+        if setup.nonce is not None:
             trade = 'TRADE|CLOSE|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
-                    '|IcarusBot Trade|' + trades[pair] + '|' + volume
+                    '|IcarusBot Trade|' + setup.nonce + '|' + volume
             s.send_string(trade, encoding='utf-8')
             log("Waiting for metatrader to respond...")
-            m = str(s.recv())
-            log("Reply from server " + m)
-            trades[trades[pair]] = None
-            trades[pair] = None
+            m = s.recv()
+            log("Reply from server " + m.decode('utf-8'))
+            setup.nonce = None
+            db.commit()
     except Exception as e:
         log(e)
 
 
-def modify(signal, volume, pair, trades, type):
+def modify(signal, volume, pair):
     try:
-        if type == "Modify":
+        setup = db.query(Trade).filter_by(pair=pair).first()
+        if setup.nonce is not None:
             trade = 'TRADE|MODIFY|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
-                    '|IcarusBot Trade|' + trades[pair] + '|' + volume
+                    '|IcarusBot Trade|' + setup.nonce + '|' + volume
             s.send_string(trade, encoding='utf-8')
             log("Waiting for metatrader to respond...")
-            m = str(s.recv())
-            log("Reply from server " + m)
+            m = s.recv()
+            log("Reply from server " + m.decode('utf-8'))
     except Exception as e:
         log(e)
 
@@ -105,7 +115,7 @@ def modify(signal, volume, pair, trades, type):
 log("Listening to email server...")
 
 
-def readmail(volume, trades):
+def readmail(volume):
     time.sleep(1.5)
     m = imaplib.IMAP4_SSL(imap)
     m.login(user, pwd)
@@ -127,37 +137,61 @@ def readmail(volume, trades):
         try:
             pair = mail['Subject'].split()[2]
             if mail['Subject'].split()[3] == "Buy":
+                setup = db.query(Trade).filter_by(pair=pair).first()
+                if setup is None:
+                    entry = Trade(pair=pair, signal=mail['Subject'].split()[3])
+                    db.add(entry)
+                    db.commit()
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + green("Buy") + ' Triggered on ' + pair)
                 log(st + ' Buy' + ' Triggered on ' + pair)
-                if pair in trades and trades[pair] is not None:
-                    close('1', volume, pair, trades)
-                    log("Close and Reverse triggered on " + pair)
-                    trade('0', volume, pair, trades,  nonce)
-                    if pair == "SPX500":
-                        trade("0", volume, "DJI30", trades,  nonce)
-                        log(st + ' Buy' + ' Triggered on ' + "DJI30")
+                if hedging == "0":
+                    setup = db.query(Trade).filter_by(pair=pair).first()
+                    if setup.nonce is not None:
+                        close('1', volume, pair)
+                        log("Close and Reverse triggered on " + pair)
+                        trade('0', volume, pair, nonce)
+                        if pair == "SPX500":
+                            trade("0", volume, "DJI30", generate_nonce())
+                            log(st + ' Buy' + ' Triggered on ' + "DJI30")
+                    else:
+                        trade("0", volume, pair, nonce)
+                        if pair == "SPX500":
+                            trade("0", volume, "DJI30", generate_nonce())
+                            log(st + ' Buy' + ' Triggered on ' + "DJI30")
                 else:
-                    trade('0', volume, pair, trades,  nonce)
+                    trade('0', volume, pair,  nonce)
                     if pair == "SPX500":
-                        trade("0", volume, "DJI30", trades, nonce)
+                        trade("0", volume, "DJI30", generate_nonce())
                         log(st + ' Buy' + ' Triggered on ' + "DJI30")
             if mail['Subject'].split()[3] == "Sell":
+                setup = db.query(Trade).filter_by(pair=pair).first()
+                if setup is None:
+                    entry = Trade(pair=pair, signal=mail['Subject'].split()[3])
+                    db.add(entry)
+                    db.commit()
                 m.store(emailid, '+FLAGS', '\Seen')
                 print(st + red("Sell") + ' Triggered on ' + pair)
                 log(st + ' Sell' + ' Triggered on ' + pair)
-                if pair in trades and trades[pair] is not None:
-                    close('0', volume, pair, trades)
-                    log("Close and Reverse triggered on " + pair)
-                    trade('1', volume, pair, trades, nonce)
-                    if pair == "SPX500":
-                        trade("1", volume, "DJI30", trades, nonce)
-                        log(st + ' Buy' + ' Triggered on ' + "DJI30")
+                if hedging == "0":
+                    setup = db.query(Trade).filter_by(pair=pair).first()
+                    if setup.nonce is not None:
+                        close('0', volume, pair)
+                        log("Close and Reverse triggered on " + pair)
+                        trade('1', volume, pair, nonce)
+                        if pair == "SPX500":
+                            trade("1", volume, "DJI30", generate_nonce())
+                            log(st + ' Sell' + ' Triggered on ' + "DJI30")
+                    else:
+                        trade("1", volume, pair, nonce)
+                        if pair == "SPX500":
+                            trade("1", volume, "DJI30", generate_nonce())
+                            log(st + ' Sell' + ' Triggered on ' + "DJI30")
                 else:
-                    trade("1", volume, pair, trades, nonce)
+                    trade("1", volume, pair, nonce)
                     if pair == "SPX500":
-                        trade("1", volume, "DJI30", trades, nonce)
-                        log(st + ' Buy' + ' Triggered on ' + "DJI30")
+                        trade("1", volume, "DJI30", generate_nonce())
+                        log(st + ' Sell' + ' Triggered on ' + "DJI30")
         except Exception as e:
             log(e)
 
@@ -167,25 +201,22 @@ def readmail(volume, trades):
             pair = mail['Subject'].split()[2]
             if mail['Subject'].split()[3] == "Close":
                 direction = mail['Subject'].split()[4]
-                for x in trades:
-                    if trades[pair] == x:
-                        nonce = x
-                if trades[pair] is not None:
-                    if trades[nonce] == direction:
+                setup = db.query(Trade).filter_by(pair=pair).first()
+                if setup.nonce is not None:
+                    if setup.signal == direction:
                         m.store(emailid, '+FLAGS', '\Seen')
-                        print(st + green("Close") + ' Triggered on ' + pair)
+                        print(st + cyan("Close") + ' Triggered on ' + pair)
                         log(st + ' Close' + ' Triggered on ' + pair)
-                        close('0', volume, pair, trades)
                         if pair == "SPX500":
-                            close("0", volume, "DJI30", trades)
+                            close("0", volume, "DJI30")
                             log(st + ' Close' + ' Triggered on ' + "DJI30")
+                        close('0', volume, pair)
         except Exception as e:
             log(e)
 
 
 while True:
     try:
-        readmail(volume, trades)
-        np.save('trades.npy', trades)
+        readmail(volume)
     except Exception as e:
         log(e)
