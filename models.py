@@ -17,6 +17,22 @@ class Trade(Base):
     nonce = Column(String(2000))
     pair = Column(String(2000))
     signal = Column(String(2000))
+    price = Column(String(2000))
+    tp = Column(String(2000))
+    sl = Column(String(2000))
+
+    @staticmethod
+    def get_or_create(pair):
+        setup = Session().query(Trade).filter_by(pair=pair).first()
+        if setup is None:
+            entry = Trade(pair=pair)
+            Session().add(entry)
+        return setup
+
+    @staticmethod
+    def find(pair):
+        setup = Session().query(Trade).filter_by(pair=pair).first()
+        return setup
 
     def __repr__(self):
         return "<Trade(nonce='%s', pair='%s', signal='%s')>" % (
