@@ -4,10 +4,9 @@ import random
 import datetime, time
 import logging
 import json
-import models
-from models import Trade
+from models import Trade, Session
 
-db = models.Session()
+db = Session()
 
 with open('config.json') as json_data_file:
         config = json.load(json_data_file)
@@ -23,18 +22,6 @@ folder = config['folder']
 STOPLOSS = config['STOPLOSS']
 TAKEPROFIT = config['TAKEPROFIT']
 hedging = config['hedge']
-
-
-def green(msg):
-    return ' \x1b[6;30;42m' + msg + '\x1b[0m'
-
-
-def red(msg):
-    return ' \x1b[6;30;41m' + msg + '\x1b[0m'
-
-
-def cyan(msg):
-    return ' \x1b[6;30;36m' + msg + '\x1b[0m'
 
 
 def generate_nonce(length=8):
@@ -73,18 +60,21 @@ def trade(signal, volume, pair, nonce):
             direction = 'Long'
         else:
             direction = 'Short'
-        setup = db.query(Trade).filter_by(pair=pair).first()
+        setup = Trade.get_or_create(pair)
         setup.nonce = nonce
         setup.pair = pair
         setup.signal = direction
         db.commit()
+        if pair == "SPX500":
+            trade(signal, volume, "DJI30", generate_nonce())
+            log('Sell' + ' Triggered on ' + "DJI30")
     except Exception as e:
         log(e)
 
 
 def close(signal, volume, pair):
     try:
-        setup = db.query(Trade).filter_by(pair=pair).first()
+        setup = Trade.find(pair)
         if setup.nonce is not None:
             trade = 'TRADE|CLOSE|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
                     '|IcarusBot Trade|' + setup.nonce + '|' + volume
@@ -93,6 +83,7 @@ def close(signal, volume, pair):
             m = s.recv()
             log("Reply from server " + m.decode('utf-8'))
             setup.nonce = None
+            setup.signal = None
             db.commit()
     except Exception as e:
         log(e)
@@ -100,7 +91,7 @@ def close(signal, volume, pair):
 
 def modify(signal, volume, pair):
     try:
-        setup = db.query(Trade).filter_by(pair=pair).first()
+        setup = Trade.find(pair)
         if setup.nonce is not None:
             trade = 'TRADE|MODIFY|' + signal + '|' + pair + '|0|' + STOPLOSS + '|' + TAKEPROFIT + \
                     '|IcarusBot Trade|' + setup.nonce + '|' + volume
@@ -110,6 +101,12 @@ def modify(signal, volume, pair):
             log("Reply from server " + m.decode('utf-8'))
     except Exception as e:
         log(e)
+
+
+def cnr(signal, volume, pair, nonce):
+    close(signal, volume, pair)
+    log("Close and Reverse triggered on " + pair)
+    trade(signal, volume, pair, nonce)
 
 
 log("Listening to email server...")
@@ -131,86 +128,31 @@ def readmail(volume):
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
         nonce = generate_nonce()
-
-        # Open Trade
-
+        if mail['Subject'].split()[3] == "Buy":
+            signal = "0"
+        else:
+            signal = "1"
+        pair = mail['Subject'].split()[2]
         try:
-            pair = mail['Subject'].split()[2]
-            if mail['Subject'].split()[3] == "Buy":
-                setup = db.query(Trade).filter_by(pair=pair).first()
-                if setup is None:
-                    entry = Trade(pair=pair, signal=mail['Subject'].split()[3])
-                    db.add(entry)
-                    db.commit()
-                m.store(emailid, '+FLAGS', '\Seen')
-                print(st + green("Buy") + ' Triggered on ' + pair)
-                log(st + ' Buy' + ' Triggered on ' + pair)
-                if hedging == "0":
-                    setup = db.query(Trade).filter_by(pair=pair).first()
-                    if setup.nonce is not None:
-                        close('1', volume, pair)
-                        log("Close and Reverse triggered on " + pair)
-                        trade('0', volume, pair, nonce)
-                        if pair == "SPX500":
-                            trade("0", volume, "DJI30", generate_nonce())
-                            log(st + ' Buy' + ' Triggered on ' + "DJI30")
-                    else:
-                        trade("0", volume, pair, nonce)
-                        if pair == "SPX500":
-                            trade("0", volume, "DJI30", generate_nonce())
-                            log(st + ' Buy' + ' Triggered on ' + "DJI30")
+            setup = Trade.get_or_create(pair)
+            m.store(emailid, '+FLAGS', '\Seen')
+            log(st + ' Buy' + ' Triggered on ' + pair)
+            if hedging == "0":
+                if setup.nonce is not None:
+                    cnr(signal, volume, pair, nonce)
                 else:
-                    trade('0', volume, pair,  nonce)
-                    if pair == "SPX500":
-                        trade("0", volume, "DJI30", generate_nonce())
-                        log(st + ' Buy' + ' Triggered on ' + "DJI30")
-            if mail['Subject'].split()[3] == "Sell":
-                setup = db.query(Trade).filter_by(pair=pair).first()
-                if setup is None:
-                    entry = Trade(pair=pair, signal=mail['Subject'].split()[3])
-                    db.add(entry)
-                    db.commit()
-                m.store(emailid, '+FLAGS', '\Seen')
-                print(st + red("Sell") + ' Triggered on ' + pair)
-                log(st + ' Sell' + ' Triggered on ' + pair)
-                if hedging == "0":
-                    setup = db.query(Trade).filter_by(pair=pair).first()
-                    if setup.nonce is not None:
-                        close('0', volume, pair)
-                        log("Close and Reverse triggered on " + pair)
-                        trade('1', volume, pair, nonce)
-                        if pair == "SPX500":
-                            trade("1", volume, "DJI30", generate_nonce())
-                            log(st + ' Sell' + ' Triggered on ' + "DJI30")
-                    else:
-                        trade("1", volume, pair, nonce)
-                        if pair == "SPX500":
-                            trade("1", volume, "DJI30", generate_nonce())
-                            log(st + ' Sell' + ' Triggered on ' + "DJI30")
-                else:
-                    trade("1", volume, pair, nonce)
-                    if pair == "SPX500":
-                        trade("1", volume, "DJI30", generate_nonce())
-                        log(st + ' Sell' + ' Triggered on ' + "DJI30")
-        except Exception as e:
-            log(e)
-
+                    trade(signal, volume, pair, nonce)
+            else:
+                trade(signal, volume, pair, nonce)
         # Close Trade
-
-        try:
-            pair = mail['Subject'].split()[2]
             if mail['Subject'].split()[3] == "Close":
                 direction = mail['Subject'].split()[4]
-                setup = db.query(Trade).filter_by(pair=pair).first()
-                if setup.nonce is not None:
+                setup = Trade.find(pair)
+                if setup is not None:
                     if setup.signal == direction:
                         m.store(emailid, '+FLAGS', '\Seen')
-                        print(st + cyan("Close") + ' Triggered on ' + pair)
-                        log(st + ' Close' + ' Triggered on ' + pair)
-                        if pair == "SPX500":
-                            close("0", volume, "DJI30")
-                            log(st + ' Close' + ' Triggered on ' + "DJI30")
-                        close('0', volume, pair)
+                        close(signal, volume, pair)
+                        log(st + " Closed trade on " + pair)
         except Exception as e:
             log(e)
 
