@@ -6,8 +6,8 @@ from sqlalchemy.orm import sessionmaker
 
 Base = declarative_base()
 engine = create_engine('sqlite:///trades.db', echo=False)
-Session = sessionmaker(bind=engine)
-
+Session = sessionmaker(bind=engine, autocommit=True)
+db = Session()
 
 class Trade(Base):
 
@@ -23,15 +23,17 @@ class Trade(Base):
 
     @staticmethod
     def get_or_create(pair):
-        setup = Session().query(Trade).filter_by(pair=pair).first()
+        setup = db.query(Trade).filter_by(pair=pair).first()
         if setup is None:
             entry = Trade(pair=pair)
-            Session().add(entry)
+            db.add(entry)
+            db.commit()
+        setup = db.query(Trade).filter_by(pair=pair).first()
         return setup
 
     @staticmethod
     def find(pair):
-        setup = Session().query(Trade).filter_by(pair=pair).first()
+        setup = db.query(Trade).filter_by(pair=pair).first()
         return setup
 
     def __repr__(self):
