@@ -60,11 +60,11 @@ def trade(signal, volume, pair, nonce):
             direction = 'Long'
         else:
             direction = 'Short'
-        setup = Trade.get_or_create(pair)
+        setup = Trade.find(pair)
         setup.nonce = nonce
-        setup.pair = pair
         setup.signal = direction
-        db.commit()
+        db.flush()
+        # print(setup)
         if pair == "SPX500":
             trade(signal, volume, "DJI30", generate_nonce())
             log('Sell' + ' Triggered on ' + "DJI30")
@@ -84,7 +84,7 @@ def close(signal, volume, pair):
             log("Reply from server " + m.decode('utf-8'))
             setup.nonce = None
             setup.signal = None
-            db.commit()
+            db.flush()
     except Exception as e:
         log(e)
 
@@ -128,24 +128,26 @@ def readmail(volume):
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
         nonce = generate_nonce()
-        if mail['Subject'].split()[3] == "Buy":
+        direction = mail['Subject'].split()[3]
+        if direction == "Buy":
             signal = "0"
         else:
             signal = "1"
         pair = mail['Subject'].split()[2]
         try:
-            setup = Trade.get_or_create(pair)
-            m.store(emailid, '+FLAGS', '\Seen')
-            log(st + ' Buy' + ' Triggered on ' + pair)
-            if hedging == "0":
-                if setup.nonce is not None:
-                    cnr(signal, volume, pair, nonce)
+            if "Close" not in direction:
+                setup = Trade.get_or_create(pair)
+                m.store(emailid, '+FLAGS', '\Seen')
+                log(st + ' ' + direction + ' Triggered on ' + pair)
+                if hedging == "0":
+                    if setup.nonce is not None:
+                        cnr(signal, volume, pair, nonce)
+                    else:
+                        trade(signal, volume, pair, nonce)
                 else:
                     trade(signal, volume, pair, nonce)
+            # Close Trade
             else:
-                trade(signal, volume, pair, nonce)
-        # Close Trade
-            if mail['Subject'].split()[3] == "Close":
                 direction = mail['Subject'].split()[4]
                 setup = Trade.find(pair)
                 if setup is not None:
