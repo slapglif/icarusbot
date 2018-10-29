@@ -3,7 +3,6 @@ import random
 import datetime, time
 import logging
 import json
-from models import Trade, Session
 from telegram.ext import (Updater, CommandHandler, RegexHandler, ConversationHandler)
 import threading
 
