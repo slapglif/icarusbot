@@ -22,23 +22,18 @@ class Trade(Base):
     sl = Column(String(2000))
 
     @staticmethod
-    def get_or_create(pair):
-        setup = db.query(Trade).filter_by(pair=pair).first()
-        if setup is None:
-            entry = Trade(pair=pair)
-            db.add(entry)
-            db.commit()
-        setup = db.query(Trade).filter_by(pair=pair).first()
-        return setup
+    def find(pair):
+        return db.query(Trade).filter_by(pair=pair).first()
 
     @staticmethod
-    def find(pair):
-        setup = db.query(Trade).filter_by(pair=pair).first()
-        return setup
+    def create(**kwargs):
+        entry = Trade(**kwargs)
+        db.add(entry)
+        db.commit()
+        return entry
 
     def __repr__(self):
-        return "<Trade(nonce='%s', pair='%s', signal='%s')>" % (
-                                self.nonce, self.pair, self.signal)
+        return f"<Trade(nonce='{self.nonce}', pair='{self.pair}', signal='{self.signal}')>"
 
 
 Base.metadata.create_all(engine)

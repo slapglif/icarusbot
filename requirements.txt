@@ -1,0 +1,5 @@
+pydantic==1.8.2
+python-dotenv==1.0.0
+pyzmq==25.0.1
+SQLAlchemy==1.4.35
+telegram==0.0.1
