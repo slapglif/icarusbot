@@ -6,13 +6,17 @@ import json
 from telegram.ext import (Updater, CommandHandler, RegexHandler, ConversationHandler)
 import threading
 
+from app import Session
+
+
 SIGNALS = range(4)
 
 db = Session()
 
-with open('config.json') as json_data_file:
-        config = json.load(json_data_file)
 
+
+with open('config.json') as json_data_file:
+    config = json.load(json_data_file)
 
 volume = config['volume']
 debug = config['debug']
@@ -27,26 +31,27 @@ folder = config['folder']
 
 
 
-def log(msg):
-    if debug == "1":
-        print(msg)
-    logging.info(msg)
 
 
 # INIT
 logging.basicConfig(filename=LOG_FILENAME, level=logging.INFO)
 
 
-
 def tele(direction, pair, bot, update):
+    """
+    Send a message when the command /start is issued.
+    """
     update.message.reply_text(
-        "Signal Detected by IcarusBot: " + direction + " on " + pair)
+        f"Signal Detected by IcarusBot: {direction} on {pair}"
+    )
 
     return SIGNALS
 
 
 bots = []
 updates = []
+
+
 def start(bot, update):
     bots.append(bot)
     updates.append(update)
@@ -62,7 +67,7 @@ def readmail():
         time.sleep(1.5)
         m = imaplib.IMAP4_SSL(imap)
         m.login(user, pwd)
-        m.select('"' + folder + '"')
+        m.select(f'"{folder}"')
         resp, items = m.search(None,
                                "NOT SEEN SUBJECT tradingview")
         items = items[0].split()
@@ -84,16 +89,16 @@ def readmail():
                 if "Close" not in direction:
                     # setup = Trade.get_or_create(pair)
                     m.store(emailid, '+FLAGS', '\Seen')
-                    log(st + ' ' + direction + ' Triggered on ' + pair)
+                    log(f'{st} {direction} Triggered on {pair}')
                     tele(direction, pair, bot, update)
-                # Close Trade
                 else:
                     direction = mail['Subject'].split()[4]
                     m.store(emailid, '+FLAGS', '\Seen')
                     tele(direction, pair, bot, update)
-                    log(st + " Closed trade on " + pair)
+                    log(f"{st} Closed trade on {pair}")
             except Exception as e:
                 log(e)
+
 
 def cancel(bot, update):
     user = update.message.from_user
@@ -133,5 +138,4 @@ def main():
 
 
 if __name__ == '__main__':
-
     main()

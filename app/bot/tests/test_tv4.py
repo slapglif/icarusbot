@@ -170,7 +170,7 @@ class TestTradingScript(TestCase):
         """
         Test execute_trade_action function
         """
-        trade_data = {'pair': 'EURUSD', 'signal': 'Buy', 'nonce': '12345678', 'volume': '0.01', 'target_symbol': None, 'action': None}
+        trade_data = {'pair': 'EURUSD', 'signal': 'Buy', 'nonce': '12345678', 'volume': '0.01', 'target_symbol': "EURUSD", 'action': "OPEN"}
         trade_data = TradeData(**trade_data)
         # Test TRADE
         mock_create_trade_payload.return_value = 'test_trade_payload'

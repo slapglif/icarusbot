@@ -44,3 +44,5 @@ for example
 ```EURUSD Sell```
 
 The system will continuously monitor the specified email account, parse incoming trade signals, and execute trades on the MetaTrader platform accordingly.
+
+The system will continuously monitor the specified email account, parse incoming trade signals, and execute trades on the MetaTrader platform accordingly.
