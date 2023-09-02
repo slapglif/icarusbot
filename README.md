@@ -1,3 +1,5 @@
+# DEV NOTE: PYTHON IS NATIVELY SUPPORTED WITH MT5 - WE DONT NEED HACKS LIKE THIS ANYMORE 
+
 # Overview
 IcarusBot is an email-driven trading system that listens to incoming trade signals from TradingView and automatically executes trades on the MetaTrader platform. The bot monitors a specified email account, parses trade signal emails, and processes the email subject to determine the appropriate trading action. It then delegates the trading action to a trade handler responsible for communicating with the MetaTrader platform.
 
